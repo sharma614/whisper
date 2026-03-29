@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whisper — Voice Note Summariser</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2330;
+    --accent: #3dddb4;
+    --accent2: #2a9d8f;
+    --accent-glow: rgba(61,221,180,.15);
+    --text: #e6edf3;
+    --text-muted: #7d8590;
+    --border: #30363d;
+    --danger: #f07070;
+    --radius: 14px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+    animation: fadeUp .7s ease both;
+  }
+
+  header h1 {
+    font-family: 'Lora', Georgia, serif;
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    font-weight: 600;
+    letter-spacing: -.5px;
+    background: linear-gradient(135deg, var(--accent), #5ae4c8, #80ffe8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header p {
+    color: var(--text-muted);
+    font-size: .9rem;
+    margin-top: 6px;
+    letter-spacing: .3px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 100%;
+    max-width: 660px;
+    animation: fadeUp .7s ease both;
+  }
+
+  /* API KEY */
+  #api-section {
+    margin-bottom: 20px;
+    animation-delay: .1s;
+  }
+
+  .field-label {
+    font-size: .78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  input[type="password"], input[type="text"] {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: .9rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  input:focus { border-color: var(--accent2); }
+
+  .btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: .85rem;
+    font-weight: 500;
+    padding: 10px 18px;
+    transition: background .2s, border-color .2s, transform .1s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { background: var(--border); }
+  .btn:active { transform: scale(.97); }
+
+  .btn-accent {
+    background: var(--accent2);
+    border-color: var(--accent2);
+    color: #0d1117;
+  }
+
+  .btn-accent:hover { background: var(--accent); border-color: var(--accent); }
+
+  /* RECORDER */
+  #recorder-section { animation-delay: .15s; }
+
+  .record-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 0;
+  }
+
+  #record-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid var(--accent2);
+    background: var(--surface2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .25s;
+    box-shadow: 0 0 0 0 var(--accent-glow);
+    position: relative;
+  }
+
+  #record-btn:hover { border-color: var(--accent); background: var(--accent-glow); }
+
+  #record-btn.recording {
+    border-color: var(--danger);
+    animation: pulse 1.5s infinite;
+  }
+
+  #record-btn svg { transition: transform .2s; }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(240,112,112,.4); }
+    70%  { box-shadow: 0 0 0 18px rgba(240,112,112,0); }
+    100% { box-shadow: 0 0 0 0 rgba(240,112,112,0); }
+  }
+
+  /* WAVEFORM */
+  #waveform {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 40px;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+
+  #waveform.active { opacity: 1; }
+
+  .bar {
+    width: 3px;
+    background: var(--accent);
+    border-radius: 3px;
+    animation: wave 1.2s ease-in-out infinite;
+    min-height: 4px;
+  }
+
+  .bar:nth-child(1)  { animation-delay: 0s;    --h: 20px; }
+  .bar:nth-child(2)  { animation-delay: .1s;   --h: 32px; }
+  .bar:nth-child(3)  { animation-delay: .2s;   --h: 24px; }
+  .bar:nth-child(4)  { animation-delay: .3s;   --h: 38px; }
+  .bar:nth-child(5)  { animation-delay: .15s;  --h: 28px; }
+  .bar:nth-child(6)  { animation-delay: .25s;  --h: 35px; }
+  .bar:nth-child(7)  { animation-delay: .05s;  --h: 22px; }
+  .bar:nth-child(8)  { animation-delay: .35s;  --h: 30px; }
+  .bar:nth-child(9)  { animation-delay: .12s;  --h: 18px; }
+  .bar:nth-child(10) { animation-delay: .28s;  --h: 26px; }
+  .bar:nth-child(11) { animation-delay: .08s;  --h: 34px; }
+  .bar:nth-child(12) { animation-delay: .18s;  --h: 20px; }
+
+  @keyframes wave {
+    0%, 100% { height: 4px; }
+    50%       { height: var(--h, 20px); }
+  }
+
+  #status-text {
+    font-size: .83rem;
+    color: var(--text-muted);
+    height: 18px;
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* TRANSCRIPT */
+  #transcript-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Lora', Georgia, serif;
+    font-size: .95rem;
+    line-height: 1.7;
+    margin-top: 18px;
+    min-height: 80px;
+    padding: 14px 16px;
+    width: 100%;
+    resize: vertical;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  #transcript-box:focus { border-color: var(--accent2); }
+
+  .row-btns {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* SUMMARY */
+  #summary-section {
+    display: none;
+    animation: fadeUp .5s ease both;
+    animation-delay: .05s;
+    margin-top: 20px;
+  }
+
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 26px;
+    width: 100%;
+    max-width: 660px;
+    position: relative;
+  }
+
+  .summary-card h2 {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  #gist {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.05rem;
+    font-style: italic;
+    color: var(--text);
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  .section-label {
+    font-size: .72rem;
+    font-weight: 500;
+    color: var(--accent2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 14px 0 8px;
+  }
+
+  #bullets { list-style: none; }
+
+  #bullets li {
+    padding: 5px 0 5px 18px;
+    position: relative;
+    font-size: .9rem;
+    line-height: 1.6;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #bullets li:last-child { border-bottom: none; }
+
+  #bullets li::before {
+    content: '▸';
+    color: var(--accent);
+    position: absolute;
+    left: 0;
+  }
+
+  .tags-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .tag {
+    background: var(--accent-glow);
+    border: 1px solid var(--accent2);
+    border-radius: 20px;
+    color: var(--accent);
+    font-size: .78rem;
+    padding: 3px 12px;
+    letter-spacing: .3px;
+  }
+
+  #next-action {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    color: var(--text);
+    font-size: .9rem;
+    line-height: 1.6;
+    margin-top: 4px;
+    padding: 10px 14px;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: .75rem;
+    padding: 5px 10px;
+    transition: all .2s;
+  }
+
+  .copy-btn:hover { border-color: var(--accent2); color: var(--accent); }
+
+  /* HISTORY */
+  #history-section {
+    width: 100%;
+    max-width: 660px;
+    margin-top: 28px;
+    animation: fadeUp .7s ease both;
+    animation-delay: .25s;
+  }
+
+  #history-section h3 {
+    font-family: 'Lora', serif;
+    font-size: .95rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #history-section h3 span {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .hist-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    margin-bottom: 8px;
+    padding: 14px 18px;
+    transition: border-color .2s, background .2s;
+  }
+
+  .hist-item:hover { border-color: var(--accent2); background: var(--surface2); }
+
+  .hist-date { font-size: .72rem; color: var(--text-muted); margin-bottom: 3px; }
+
+  .hist-gist {
+    font-family: 'Lora', serif;
+    font-size: .9rem;
+    font-style: italic;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hist-mood { font-size: .75rem; color: var(--accent2); margin-top: 4px; }
+
+  /* SPINNER */
+  .spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--accent2);
+    border-radius: 8px;
+    color: var(--accent);
+    font-size: .85rem;
+    padding: 10px 22px;
+    transition: transform .3s ease;
+    z-index: 99;
+    pointer-events: none;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  @media (max-width: 500px) {
+    .card, .summary-card, #history-section { padding: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Whisper</h1>
+  <p>Voice notes, distilled into clarity</p>
+</header>
+
+<!-- API Key -->
+<div class="card" id="api-section">
+  <label class="field-label" for="api-key-input">Anthropic API Key</label>
+  <div class="input-row">
+    <input type="password" id="api-key-input" placeholder="sk-ant-…" autocomplete="off">
+    <button class="btn btn-accent" onclick="saveKey()">Save</button>
+  </div>
+</div>
+
+<!-- Recorder -->
+<div class="card" id="recorder-section" style="margin-top:16px;">
+  <div class="record-center">
+    <div id="waveform">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+    <button id="record-btn" onclick="toggleRecording()" title="Start / Stop recording">
+      <!-- mic icon -->
+      <svg id="icon-mic" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="12" rx="3"/>
+        <path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
+      </svg>
+      <!-- stop icon -->
+      <svg id="icon-stop" width="24" height="24" viewBox="0 0 24 24" fill="var(--danger)" style="display:none">
+        <rect x="5" y="5" width="14" height="14" rx="2"/>
+      </svg>
+    </button>
+    <div id="status-text">Tap to start recording</div>
+  </div>
+
+  <hr class="divider">
+
+  <label class="field-label" for="transcript-box">Transcript</label>
+  <textarea id="transcript-box" rows="4" placeholder="Your spoken words will appear here — or type directly…"></textarea>
+
+  <div class="row-btns">
+    <button class="btn btn-accent" onclick="summarise()" id="summarise-btn">✦ Summarise</button>
+    <button class="btn" onclick="clearAll()">Clear</button>
+  </div>
+</div>
+
+<!-- Summary -->
+<div id="summary-section">
+  <div class="summary-card">
+    <button class="copy-btn" onclick="copySummary()">Copy</button>
+    <h2>Summary</h2>
+    <div id="gist"></div>
+
+    <div class="section-label">Key Points</div>
+    <ul id="bullets"></ul>
+
+    <div class="section-label">Mood / Tone</div>
+    <div class="tags-row" id="mood-tags"></div>
+
+    <div class="section-label">Next Action</div>
+    <div id="next-action"></div>
+  </div>
+</div>
+
+<!-- History -->
+<div id="history-section">
+  <h3>Recent Notes <span></span></h3>
+  <div id="history-list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+let recognition = null;
+let isRecording = false;
+let interimText = '';
+let finalText = '';
+
+const KEY_LS = 'whisper_api_key';
+const HIST_LS = 'whisper_history';
+
+// ── Init ───────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem(KEY_LS);
+  if (saved) document.getElementById('api-key-input').value = saved;
+  renderHistory();
+});
+
+// ── API Key ────────────────────────────────────────────
+function saveKey() {
+  const v = document.getElementById('api-key-input').value.trim();
+  if (!v) return showToast('Enter your API key first');
+  localStorage.setItem(KEY_LS, v);
+  showToast('API key saved ✓');
+}
+
+// ── Recording ──────────────────────────────────────────
+function toggleRecording() {
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    showToast('Speech API not supported in this browser');
+    return;
+  }
+  isRecording ? stopRecording() : startRecording();
+}
+
+function startRecording() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  finalText = document.getElementById('transcript-box').value || '';
+
+  recognition.onresult = e => {
+    interimText = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
+      else interimText += e.results[i][0].transcript;
+    }
+    document.getElementById('transcript-box').value = finalText + interimText;
+  };
+
+  recognition.onerror = err => {
+    setStatus('Error: ' + err.error);
+    stopRecording();
+  };
+
+  recognition.onend = () => { if (isRecording) recognition.start(); };
+
+  recognition.start();
+  isRecording = true;
+  setRecordingUI(true);
+}
+
+function stopRecording() {
+  if (recognition) { recognition.onend = null; recognition.stop(); }
+  isRecording = false;
+  setRecordingUI(false);
+  document.getElementById('transcript-box').value = finalText.trim();
+}
+
+function setRecordingUI(on) {
+  document.getElementById('record-btn').classList.toggle('recording', on);
+  document.getElementById('icon-mic').style.display = on ? 'none' : '';
+  document.getElementById('icon-stop').style.display = on ? '' : 'none';
+  document.getElementById('waveform').classList.toggle('active', on);
+  setStatus(on ? 'Listening…' : 'Tap to start recording');
+}
+
+function setStatus(t) { document.getElementById('status-text').textContent = t; }
+
+// ── Summarise ─────────────────────────────────────────
+async function summarise() {
+  const transcript = document.getElementById('transcript-box').value.trim();
+  if (!transcript) return showToast('Nothing to summarise');
+
+  const key = (document.getElementById('api-key-input').value.trim()) ||
+              localStorage.getItem(KEY_LS);
+  if (!key) return showToast('Please save your Anthropic API key first');
+
+  const btn = document.getElementById('summarise-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Thinking…';
+  setStatus('Sending to Claude…');
+
+  const prompt = `Analyse this voice note transcript and return a JSON object with exactly these keys:
+- "gist": one concise sentence summarising the whole note
+- "bullets": array of 3-5 key point strings
+- "mood": array of 1-3 mood/tone tag strings (e.g. "reflective", "energised", "anxious")
+- "next_action": one concrete next step the speaker should take
+
+Transcript:
+"""
+${transcript}
+"""
+
+Reply with ONLY valid JSON, no markdown fences.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 512,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw = data.content[0].text.trim();
+    const json = JSON.parse(raw);
+    renderSummary(json);
+    saveToHistory({ transcript, ...json, date: new Date().toISOString() });
+  } catch (e) {
+    showToast('Error: ' + e.message);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✦ Summarise';
+    setStatus('Tap to start recording');
+  }
+}
+
+// ── Render Summary ────────────────────────────────────
+function renderSummary(d) {
+  document.getElementById('gist').textContent = d.gist || '';
+
+  const ul = document.getElementById('bullets');
+  ul.innerHTML = '';
+  (d.bullets || []).forEach(b => {
+    const li = document.createElement('li');
+    li.textContent = b;
+    ul.appendChild(li);
+  });
+
+  const tags = document.getElementById('mood-tags');
+  tags.innerHTML = '';
+  (d.mood || []).forEach(m => {
+    const span = document.createElement('span');
+    span.className = 'tag';
+    span.textContent = m;
+    tags.appendChild(span);
+  });
+
+  document.getElementById('next-action').textContent = d.next_action || '';
+
+  const sec = document.getElementById('summary-section');
+  sec.style.display = 'block';
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Copy ──────────────────────────────────────────────
+function copySummary() {
+  const gist = document.getElementById('gist').textContent;
+  const bullets = [...document.querySelectorAll('#bullets li')].map(l => '• ' + l.textContent).join('\n');
+  const mood = [...document.querySelectorAll('#mood-tags .tag')].map(t => t.textContent).join(', ');
+  const next = document.getElementById('next-action').textContent;
+  const text = `${gist}\n\nKey Points:\n${bullets}\n\nMood: ${mood}\n\nNext Action: ${next}`;
+  navigator.clipboard.writeText(text).then(() => showToast('Copied!')).catch(() => showToast('Copy failed'));
+}
+
+// ── History ───────────────────────────────────────────
+function saveToHistory(entry) {
+  let hist = getHistory();
+  hist.unshift(entry);
+  hist = hist.slice(0, 5);
+  localStorage.setItem(HIST_LS, JSON.stringify(hist));
+  renderHistory();
+}
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(HIST_LS)) || []; }
+  catch { return []; }
+}
+
+function renderHistory() {
+  const hist = getHistory();
+  const el = document.getElementById('history-list');
+  const sec = document.getElementById('history-section');
+  if (!hist.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  el.innerHTML = hist.map((h, i) => `
+    <div class="hist-item" onclick="loadNote(${i})">
+      <div class="hist-date">${new Date(h.date).toLocaleString()}</div>
+      <div class="hist-gist">${h.gist || h.transcript?.slice(0,80)}</div>
+      <div class="hist-mood">${(h.mood||[]).join(' · ')}</div>
+    </div>`).join('');
+}
+
+function loadNote(i) {
+  const h = getHistory()[i];
+  if (!h) return;
+  document.getElementById('transcript-box').value = h.transcript;
+  renderSummary(h);
+}
+
+// ── Clear ─────────────────────────────────────────────
+function clearAll() {
+  if (isRecording) stopRecording();
+  finalText = ''; interimText = '';
+  document.getElementById('transcript-box').value = '';
+  document.getElementById('summary-section').style.display = 'none';
+}
+
+// ── Toast ─────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+</script>
+</body>
+</html>
