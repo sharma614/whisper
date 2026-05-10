@@ -12,9 +12,9 @@
     --bg: #0d1117;
     --surface: #161b22;
     --surface2: #1c2330;
-    --accent: #3dddb4;
-    --accent2: #2a9d8f;
-    --accent-glow: rgba(61,221,180,.15);
+    --accent: #4d9eff;
+    --accent2: #3a7bd5;
+    --accent-glow: rgba(77,158,255,.15);
     --text: #e6edf3;
     --text-muted: #7d8590;
     --border: #30363d;
@@ -45,7 +45,7 @@
     font-size: clamp(2rem, 5vw, 2.8rem);
     font-weight: 600;
     letter-spacing: -.5px;
-    background: linear-gradient(135deg, var(--accent), #5ae4c8, #80ffe8);
+    background: linear-gradient(135deg, var(--accent), #6db3f2, #a8d8ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -456,9 +456,9 @@
 
 <!-- API Key -->
 <div class="card" id="api-section">
-  <label class="field-label" for="api-key-input">Anthropic API Key</label>
+  <label class="field-label" for="api-key-input">Groq API Key <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent);text-transform:none;letter-spacing:0;font-weight:400">(Get free key)</a></label>
   <div class="input-row">
-    <input type="password" id="api-key-input" placeholder="sk-ant-…" autocomplete="off">
+    <input type="password" id="api-key-input" placeholder="gsk_…" autocomplete="off">
     <button class="btn btn-accent" onclick="saveKey()">Save</button>
   </div>
 </div>
@@ -530,7 +530,7 @@ let isRecording = false;
 let interimText = '';
 let finalText = '';
 
-const KEY_LS = 'whisper_api_key';
+const KEY_LS = 'whisper_groq_key';
 const HIST_LS = 'whisper_history';
 
 // ── Init ───────────────────────────────────────────────
@@ -611,12 +611,12 @@ async function summarise() {
 
   const key = (document.getElementById('api-key-input').value.trim()) ||
               localStorage.getItem(KEY_LS);
-  if (!key) return showToast('Please save your Anthropic API key first');
+  if (!key) return showToast('Please save your Groq API key first');
 
   const btn = document.getElementById('summarise-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Thinking…';
-  setStatus('Sending to Claude…');
+  setStatus('Sending to Groq…');
 
   const prompt = `Analyse this voice note transcript and return a JSON object with exactly these keys:
 - "gist": one concise sentence summarising the whole note
@@ -632,18 +632,17 @@ ${transcript}
 Reply with ONLY valid JSON, no markdown fences.`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
         max_tokens: 512,
-        messages: [{ role: 'user', content: prompt }]
+        response_format: { type: 'json_object' }
       })
     });
 
@@ -653,7 +652,7 @@ Reply with ONLY valid JSON, no markdown fences.`;
     }
 
     const data = await res.json();
-    const raw = data.content[0].text.trim();
+    const raw = data.choices[0].message.content.trim();
     const json = JSON.parse(raw);
     renderSummary(json);
     saveToHistory({ transcript, ...json, date: new Date().toISOString() });
